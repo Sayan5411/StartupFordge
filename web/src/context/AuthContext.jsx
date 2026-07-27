@@ -26,6 +26,15 @@ export function AuthProvider({ children }) {
     return authData;
   };
 
+  const oauth = async (provider) => {
+    const authData = await pb.collection("users").authWithOAuth2({ provider });
+    setUser(authData.record);
+    return authData;
+  };
+
+  // Only these fields are ever sent on signup. Never spread the raw form
+  // object into create() - that would let a client set fields like
+  // "verified", "role", or "trustScore" directly and self-escalate.
   const signup = async (data) => {
     const newUser = await pb.collection("users").create({
       email: data.email,
@@ -33,7 +42,7 @@ export function AuthProvider({ children }) {
       passwordConfirm: data.passwordConfirm || data.password,
       name: data.name || data.fullName,
       role: data.role,
-      ...data,
+      headline: data.headline || "",
     });
 
     if (data.email && data.password) {
@@ -48,8 +57,10 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const isAuthed = !!user && pb.authStore.isValid;
+
   return (
-    <AuthContext.Provider value={{ user, setUser, login, signup, logout, loading, pb }}>
+    <AuthContext.Provider value={{ user, setUser, isAuthed, login, signup, oauth, logout, loading, pb }}>
       {!loading && children}
     </AuthContext.Provider>
   );

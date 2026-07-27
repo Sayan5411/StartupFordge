@@ -317,11 +317,20 @@ export function OpportunityDetail() {
   const [motivation, setMotivation] = useState('');
   const [roleApplied, setRoleApplied] = useState('');
 
-  const load = () => {
-    pb.collection('opportunities').getOne(id, { expand: 'owner' }).then(setO).catch(() => {});
-    pb.collection('applications').getFullList({ filter: `opportunity="${id}"`, expand: 'owner' }).then(setApps).catch(() => {});
+  const load = async () => {
+    const opp = await pb.collection('opportunities').getOne(id, { expand: 'owner' }).catch(() => null);
+    setO(opp);
+    // Applicant data (names, motivation text) is only fetched for the
+    // opportunity owner - a plain visitor/applicant has no reason to see
+    // everyone else's applications, and shouldn't have that data land in
+    // client state at all.
+    if (opp && opp.owner === user.id) {
+      pb.collection('applications').getFullList({ filter: `opportunity="${id}"`, expand: 'owner' }).then(setApps).catch(() => {});
+    } else {
+      pb.collection('applications').getFullList({ filter: `opportunity="${id}" && owner="${user.id}"` }).then(setApps).catch(() => {});
+    }
   };
-  useEffect(load, [id]);
+  useEffect(() => { load(); }, [id]);
   if (!o) return <Empty title="Loading…" />;
   const isOwner = o.owner === user.id;
   const mine = apps.find((a) => a.owner === user.id);
@@ -362,7 +371,7 @@ export function OpportunityDetail() {
           <span className="flex items-center gap-1"><Clock className="w-4 h-4" />{o.duration} · {o.commitmentHours}h/wk</span>
           <span className="flex items-center gap-1"><Target className="w-4 h-4" />{o.goal}</span>
         </div>
-        {o.description && <p className="mt-4 text-sm leading-relaxed whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: o.description }} />}
+        {o.description && <p className="mt-4 text-sm leading-relaxed whitespace-pre-wrap">{o.description}</p>}
         <div className="flex flex-wrap gap-1.5 mt-4">{arr(o.stack).map((s) => <span key={s} className="text-xs px-2 py-1 rounded-full bg-secondary">{s}</span>)}</div>
         <div className="flex flex-wrap gap-1.5 mt-2">{arr(o.rolesNeeded).map((r) => <span key={r} className="text-xs px-2 py-1 rounded-full bg-accent/10 text-accent">{r}</span>)}</div>
         <div className="mt-6 flex gap-3">
@@ -393,7 +402,7 @@ export function OpportunityDetail() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2"><p className="font-medium">{a.expand?.owner?.name || 'Applicant'}</p><TrustBadge score={a.expand?.owner?.trustScore ?? 0} /></div>
                   <p className="text-xs text-muted-foreground">{a.roleApplied} · {a.expand?.owner?.role}</p>
-                  <p className="text-sm mt-1" dangerouslySetInnerHTML={{ __html: a.motivation }} />
+                  <p className="text-sm mt-1 whitespace-pre-wrap">{a.motivation}</p>
                 </div>
                 {a.status === 'pending' ? (
                   <div className="flex gap-2"><Btn variant="accent" onClick={() => decide(a, 'accepted')}><Check className="w-4 h-4" /></Btn><Btn variant="danger" onClick={() => decide(a, 'rejected')}><X className="w-4 h-4" /></Btn></div>
